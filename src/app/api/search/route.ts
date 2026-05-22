@@ -1,5 +1,29 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+interface UnsplashPhoto {
+  id: string;
+  description: string | null;
+  alt_description: string | null;
+  urls: {
+    raw: string;
+    full: string;
+    regular: string;
+    small: string;
+    thumb: string;
+  };
+  user: {
+    name: string;
+    username: string;
+  };
+}
+
+interface SearchResult {
+  id: string;
+  imageUrl: string;
+  description: string;
+  photographer: string;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -12,8 +36,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // This is the procedure that handles the search
-    const results = await searchDishes(query);
+    const accessKey = process.env.UNSPLASH_ACCESS_KEY;
+
+    if (!accessKey) {
+      return NextResponse.json(
+        { error: "Unsplash API key not configured" },
+        { status: 500 },
+      );
+    }
+
+    const response = await fetch(
+      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=10&content_filter=high`,
+      {
+        headers: {
+          Authorization: `Client-ID ${accessKey}`,
+          "Accept-Version": "v1",
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Unsplash API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    const results: SearchResult[] = data.results.map(
+      (photo: UnsplashPhoto) => ({
+        id: photo.id,
+        imageUrl: photo.urls.regular,
+        description: photo.alt_description || photo.description || query,
+        photographer: photo.user.name,
+      }),
+    );
 
     return NextResponse.json({ results });
   } catch (error) {
@@ -23,17 +78,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
-
-// The procedure that searches for dishes
-async function searchDishes(query: string): Promise<string[]> {
-  // TODO: Implement actual search logic here
-  // This could query a database, call an external API, etc.
-
-  // Placeholder implementation
-  return [
-    `Dish matching "${query}" - Result 1`,
-    `Dish matching "${query}" - Result 2`,
-    `Dish matching "${query}" - Result 3`,
-  ];
 }

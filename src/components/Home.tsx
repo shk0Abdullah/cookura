@@ -1,22 +1,42 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
+import RecipeCard from "./RecipeCard";
 import SearchBar from "./SearchBar";
 
+interface Recipe {
+  dishName: string;
+  description: string;
+  prepTime: string;
+  cookTime: string;
+  servings: number;
+  ingredients: string[];
+  instructions: string[];
+  tips: string[];
+}
+
+interface RecipeResult {
+  recipe: Recipe;
+  imageUrl: string | null;
+  photographer: string | null;
+}
+
 export default function Home() {
-  const [results, setResults] = useState<string[]>([]);
+  const [result, setResult] = useState<RecipeResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSearch = async (query: string) => {
-    // Validate query before hitting the backend
     if (!query || typeof query !== "string" || query.trim().length === 0) {
-      setResults([]);
+      setResult(null);
       return;
     }
 
     setLoading(true);
+    setError(null);
     try {
-      const response = await fetch("/api/search", {
+      const response = await fetch("/api/recipe", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -25,43 +45,55 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        throw new Error("Search failed");
+        throw new Error("Recipe generation failed");
       }
 
       const data = await response.json();
-      setResults(data.results || []);
-    } catch (error) {
-      console.error("Search error:", error);
-      setResults([]);
+      setResult(data);
+    } catch (err) {
+      console.error("Recipe error:", err);
+      setError("Failed to generate recipe. Please try again.");
+      setResult(null);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <>
     <div className="min-h-screen flex flex-col items-center pt-20 px-4">
-      <div>
-        <img src="/logo.png" alt="Cookura" className="h-64 w-auto" />
+      <div className="mb-12">
+        <Image
+          src="/logo.png"
+          alt="Cookura"
+          className="h-64 w-auto"
+          width={256}
+          height={256}
+        />
       </div>
 
-      <SearchBar onSearch={handleSearch} />
+      <SearchBar onSearch={handleSearch} placeholder="Enter a dish name..." />
 
-      {loading && <div className="mt-8 text-gray-600">Searching...</div>}
+      {loading && (
+        <div className="mt-8 text-gray-600 animate-pulse">
+          Generating recipe...
+        </div>
+      )}
 
-      {results.length > 0 && (
-        <div className="mt-8 w-full max-w-2xl">
-          <h2 className="text-xl font-semibold mb-4">Results:</h2>
-          <ul className="space-y-2">
-            {results.map((result) => (
-              <li key={result} className="p-3 bg-gray-50 rounded-lg">
-                {result}
-              </li>
-            ))}
-          </ul>
+      {error && (
+        <div className="mt-8 text-red-500 bg-red-50 px-4 py-2 rounded-lg">
+          {error}
+        </div>
+      )}
+
+      {!loading && result && (
+        <div className="mt-8 w-full max-w-4xl">
+          <RecipeCard
+            recipe={result.recipe}
+            imageUrl={result.imageUrl}
+            photographer={result.photographer}
+          />
         </div>
       )}
     </div>
-    </>
   );
 }
